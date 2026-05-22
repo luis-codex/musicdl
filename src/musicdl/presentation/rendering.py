@@ -1,14 +1,5 @@
 from __future__ import annotations
 
-from rich.console import Console
-from rich.progress import (
-    BarColumn,
-    MofNCompleteColumn,
-    Progress,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-)
 from rich.table import Table
 
 from musicdl.domain import Track
@@ -23,14 +14,3 @@ def render_tracks(tracks: list[Track], title: str | None = None) -> Table:
     for t in tracks:
         table.add_row(str(t.index), t.title, t.artist, t.duration_str)
     return table
-
-
-def make_progress(console: Console) -> Progress:
-    return Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeElapsedColumn(),
-        console=console,
-    )

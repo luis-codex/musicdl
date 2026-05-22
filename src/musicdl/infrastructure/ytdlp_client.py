@@ -28,8 +28,8 @@ class YtDlpClient:
             return []
         entries = info.get("entries")
         if entries is None:
-            return [info]
-        return [e for e in entries if e]
+            return [dict(info)]
+        return [dict(e) for e in entries if e]
 
     def download(self, url: str, opts: dict) -> int:
         """Run yt-dlp with the given opts. Returns 0 on success."""

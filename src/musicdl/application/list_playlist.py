@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from rich.console import Console
 
 from musicdl.domain import Command, CookieSource, Track
-from musicdl.rendering import render_tracks
-from musicdl.ytdlp_client import YtDlpClient
+from musicdl.infrastructure import YtDlpClient
+from musicdl.presentation.rendering import render_tracks
 
 
 @dataclass

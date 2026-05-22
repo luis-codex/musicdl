@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from musicdl.commands import (
+from musicdl.application import (
     DownloadMediaCommand,
     DownloadTranscriptsCommand,
     ListPlaylistCommand,

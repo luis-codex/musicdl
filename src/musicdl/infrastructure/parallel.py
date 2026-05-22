@@ -6,12 +6,30 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
 
-from musicdl.archive import append_id, read_ids
-from musicdl.rendering import make_progress
+from musicdl.infrastructure.archive import append_id, read_ids
 
 Worker = Callable[[dict], None]
 """Function that downloads a single entry. Receives the yt-dlp entry dict."""
+
+
+def _make_progress(console: Console) -> Progress:
+    return Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        console=console,
+    )
 
 
 def run_parallel(
@@ -23,10 +41,7 @@ def run_parallel(
     console: Console,
     label: str,
 ) -> int:
-    """Fan out `worker` across `concurrent` threads, honoring the archive.
-
-    Returns the count of failures (0 = full success).
-    """
+    """Fan out `worker` across `concurrent` threads, honoring the archive."""
     already = read_ids(archive_file) if archive_file else set()
     pending = [e for e in entries if e.get("id") and e["id"] not in already]
     skipped = len(entries) - len(pending)
@@ -42,9 +57,8 @@ def run_parallel(
 
     archive_lock = threading.Lock()
     failures: list[tuple[str, str]] = []
-    progress = make_progress(console)
 
-    with progress:
+    with _make_progress(console) as progress:
         overall = progress.add_task(f"[bold]{label}[/bold]", total=len(pending))
         with ThreadPoolExecutor(max_workers=concurrent) as pool:
             futures = {pool.submit(worker, e): e for e in pending}

@@ -5,32 +5,27 @@ from pathlib import Path
 
 from rich.console import Console
 
-from musicdl.domain import AudioFormat, Command, CookieSource, MediaType, VideoFormat
-from musicdl.parallel import entry_url, run_parallel
-from musicdl.ytdlp_client import YtDlpClient
+from musicdl.domain import Command, CookieSource, SubtitleFormat
+from musicdl.infrastructure import YtDlpClient, entry_url, run_parallel
 
 
 @dataclass
-class DownloadMediaCommand(Command):
+class DownloadTranscriptsCommand(Command):
     url: str
     cookies: CookieSource
-    media_type: MediaType = MediaType.AUDIO
-    audio_format: AudioFormat = AudioFormat.M4A
-    video_format: VideoFormat = VideoFormat.MP4
-    audio_quality: str = "0"  # 0 = best (VBR); or kbps like "192"
-    max_height: int | None = None
-    output_dir: Path = field(default_factory=lambda: Path("downloads"))
-    embed_thumbnail: bool = True
-    embed_metadata: bool = True
+    output_dir: Path = field(default_factory=lambda: Path("transcripts"))
+    languages: tuple[str, ...] = ("es", "en")
+    include_auto: bool = True
+    subtitle_format: SubtitleFormat = SubtitleFormat.SRT
     archive_file: Path | None = None
     concurrent: int = 1
     console: Console = field(default_factory=Console)
 
     def execute(self) -> int:
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        target = self.audio_format if self.media_type is MediaType.AUDIO else self.video_format
+        langs = ",".join(self.languages)
         self.console.print(
-            f"[bold]Downloading {self.media_type.value}[/bold] as [cyan]{target}[/cyan] "
+            f"[bold]Downloading transcripts[/bold] ({langs}, auto={self.include_auto}) "
             f"→ [cyan]{self.output_dir}[/cyan]"
         )
 
@@ -53,19 +48,31 @@ class DownloadMediaCommand(Command):
                     concurrent=self.concurrent,
                     archive_file=self.archive_file,
                     console=self.console,
-                    label=f"Downloading {self.media_type.value}",
+                    label="Transcripts",
                 )
 
         client.download(self.url, self._build_opts())
-        self.console.print("[green]✓[/green] Done.")
+
+        files = sorted(self.output_dir.glob(f"*.{self.subtitle_format.value}"))
+        if not files:
+            self.console.print("[yellow]No transcripts found.[/yellow]")
+            return 1
+
+        self.console.print(f"[green]✓[/green] {len(files)} transcript(s) saved.")
         return 0
 
     def _build_opts(self, *, quiet: bool = False) -> dict:
         opts: dict = {
+            "skip_download": True,
+            "writesubtitles": True,
+            "writeautomaticsub": self.include_auto,
+            "subtitleslangs": list(self.languages),
+            "subtitlesformat": self.subtitle_format.value,
             "outtmpl": str(self.output_dir / "%(title)s [%(id)s].%(ext)s"),
             "ignoreerrors": True,
-            "noplaylist": False,
-            "postprocessors": [],
+            "postprocessors": [
+                {"key": "FFmpegSubtitlesConvertor", "format": self.subtitle_format.value}
+            ],
         }
         if quiet:
             opts["quiet"] = True
@@ -74,25 +81,4 @@ class DownloadMediaCommand(Command):
         if self.archive_file is not None:
             self.archive_file.parent.mkdir(parents=True, exist_ok=True)
             opts["download_archive"] = str(self.archive_file)
-
-        if self.media_type is MediaType.AUDIO:
-            opts["format"] = "bestaudio/best"
-            opts["postprocessors"].append(
-                {
-                    "key": "FFmpegExtractAudio",
-                    "preferredcodec": self.audio_format.value,
-                    "preferredquality": self.audio_quality,
-                }
-            )
-        else:
-            height_filter = f"[height<={self.max_height}]" if self.max_height else ""
-            opts["format"] = f"bv*{height_filter}+ba/b{height_filter}"
-            opts["merge_output_format"] = self.video_format.value
-
-        if self.embed_metadata:
-            opts["postprocessors"].append({"key": "FFmpegMetadata"})
-        if self.embed_thumbnail:
-            opts["writethumbnail"] = True
-            opts["postprocessors"].append({"key": "EmbedThumbnail"})
-
         return opts

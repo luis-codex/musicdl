@@ -1,3 +1,3 @@
-from musicdl.cli import main
+from musicdl.presentation import main
 
 __all__ = ["main"]
