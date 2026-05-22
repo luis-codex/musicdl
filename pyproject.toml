@@ -1,0 +1,59 @@
+[project]
+name = "musicdl"
+version = "0.1.0"
+description = "YouTube Music CLI — list, download, sync, and grab transcripts from your playlists."
+readme = "README.md"
+license = "MIT"
+authors = [
+    { name = "luis-codex", email = "luisprograming0@gmail.com" }
+]
+keywords = ["youtube-music", "yt-dlp", "music", "downloader", "cli", "playlist"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.14"
+dependencies = [
+    "rich>=13.9.4",
+    "spotdl>=4.5.0",
+    "typer>=0.25.1",
+    "yt-dlp>=2026.3.17",
+]
+
+[project.urls]
+Homepage = "https://github.com/luis-codex/musicdl"
+Repository = "https://github.com/luis-codex/musicdl"
+Issues = "https://github.com/luis-codex/musicdl/issues"
+
+[project.scripts]
+musicdl = "musicdl:main"
+
+[build-system]
+requires = ["uv_build>=0.11.11,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "ruff>=0.15.14",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

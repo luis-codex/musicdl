@@ -1,0 +1,36 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tooling
+.ruff_cache/
+.pytest_cache/
+.python-version
+
+# IDE
+.vscode/
+.idea/
+
+# musicdl runtime artifacts
+downloads/
+transcripts/
+*.m4a
+*.mp3
+*.flac
+*.opus
+*.wav
+*.mp4
+*.mkv
+*.webm
+*.srt
+*.vtt
+*.ass
+*.lrc
+.musicdl-archive.txt
