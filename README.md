@@ -55,6 +55,29 @@ Or configure it once via environment variables:
 | `MUSICDL_BROWSER`           | `firefox`   | `chrome`                                                                 |
 | `MUSICDL_BROWSER_PROFILE`   | *(empty)*   | `C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)`       |
 
+**Windows (PowerShell)** — for the current session:
+
+```powershell
+$env:MUSICDL_BROWSER = "firefox"
+$env:MUSICDL_BROWSER_PROFILE = "C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)"
+```
+
+To persist them across reboots (recommended), set them as User variables and open a **new** terminal:
+
+```powershell
+[Environment]::SetEnvironmentVariable("MUSICDL_BROWSER", "firefox", "User")
+[Environment]::SetEnvironmentVariable("MUSICDL_BROWSER_PROFILE", "C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)", "User")
+```
+
+Alternative GUI: `Win + R` → `sysdm.cpl` → *Advanced* → *Environment Variables…* → add under *User variables*.
+
+**macOS / Linux (bash/zsh)** — add to `~/.bashrc` or `~/.zshrc`:
+
+```bash
+export MUSICDL_BROWSER=firefox
+export MUSICDL_BROWSER_PROFILE="$HOME/.mozilla/firefox/xxxx.default-release"
+```
+
 > ⚠️ **Windows + Chromium (Chrome/Brave/Edge):** since 2024 these browsers use **Application-Bound Encryption** and `yt-dlp` cannot decrypt their cookies ([yt-dlp#10927](https://github.com/yt-dlp/yt-dlp/issues/10927)). Use Firefox/Zen or export a `cookies.txt` manually.
 
 ## Commands
