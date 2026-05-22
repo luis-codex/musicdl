@@ -14,6 +14,25 @@ lumen-dlp sync -o ./music -a mp3 -q 0 -j 8
 
 ---
 
+## How it works
+
+A URL goes in, a tagged file lands on disk. Two stages do the work: **Download** (yt-dlp pulls bytes from whatever site you threw at it) and **Transform** (ffmpeg re-muxes, transcodes, and embeds metadata + cover art).
+
+```mermaid
+flowchart LR
+    U([User]) -->|"lumen-dlp <cmd> &lt;url&gt;"| CLI[CLI<br/>typer]
+    CLI --> UC[Use case<br/>list · download · sync · transcripts]
+    UC --> CK[(Browser cookies<br/>firefox · chrome · ...)]
+    UC --> DL[["**Download**<br/>yt-dlp"]]
+    DL -->|any of 1000+ sites| NET((Internet))
+    DL --> XF[["**Transform**<br/>ffmpeg"]]
+    XF --> OUT[(Files on disk<br/>mp3 · m4a · flac · mp4 · srt)]
+    UC -. sync mode .-> ARC[(.lumen-dlp-archive.txt)]
+    ARC -. skip seen IDs .-> UC
+```
+
+---
+
 ## Why lumen-dlp
 
 There are a hundred yt-dlp wrappers. Most of them stop being useful the moment you want to:
