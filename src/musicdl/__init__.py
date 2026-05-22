@@ -64,6 +64,15 @@ ArchiveOpt = Annotated[
         help="Archive file tracking downloaded IDs. Defaults to <output>/.musicdl-archive.txt.",
     ),
 ]
+ConcurrentOpt = Annotated[
+    int,
+    typer.Option(
+        "--concurrent",
+        "-j",
+        min=1,
+        help="Parallel workers for playlists (default 1 = serial).",
+    ),
+]
 
 
 # --- Global callback (shared cookies) -------------------------------------------
@@ -102,6 +111,7 @@ def _build_download(
     thumbnail: bool,
     metadata: bool,
     archive: Path | None,
+    concurrent: int,
 ) -> DownloadMediaCommand:
     return DownloadMediaCommand(
         url=url,
@@ -115,6 +125,7 @@ def _build_download(
         embed_thumbnail=thumbnail,
         embed_metadata=metadata,
         archive_file=archive,
+        concurrent=concurrent,
         console=console,
     )
 
@@ -144,6 +155,7 @@ def download(
     output: OutputOpt = Path("downloads"),
     thumbnail: ThumbnailOpt = True,
     metadata: MetadataOpt = True,
+    concurrent: ConcurrentOpt = 1,
 ) -> None:
     """Download a video or playlist as audio or video, in the chosen format."""
     command = _build_download(
@@ -158,6 +170,7 @@ def download(
         thumbnail=thumbnail,
         metadata=metadata,
         archive=None,
+        concurrent=concurrent,
     )
     raise typer.Exit(code=command.execute())
 
@@ -175,6 +188,7 @@ def sync(
     archive: ArchiveOpt = None,
     thumbnail: ThumbnailOpt = True,
     metadata: MetadataOpt = True,
+    concurrent: ConcurrentOpt = 1,
 ) -> None:
     """Download only new items from a playlist, skipping anything already downloaded."""
     archive_path = archive if archive is not None else output / ".musicdl-archive.txt"
@@ -190,6 +204,7 @@ def sync(
         thumbnail=thumbnail,
         metadata=metadata,
         archive=archive_path,
+        concurrent=concurrent,
     )
     console.print(f"[dim]Archive:[/dim] {archive_path}")
     raise typer.Exit(code=command.execute())
@@ -210,6 +225,7 @@ def transcripts(
         SubtitleFormat, typer.Option("--format", "-f", help="Subtitle format.")
     ] = SubtitleFormat.SRT,
     archive: ArchiveOpt = None,
+    concurrent: ConcurrentOpt = 1,
 ) -> None:
     """Download transcripts/subtitles from a video or playlist (when available)."""
     archive_path = archive if archive is not None else output / ".musicdl-archive.txt"
@@ -221,6 +237,7 @@ def transcripts(
         include_auto=auto,
         subtitle_format=fmt,
         archive_file=archive_path,
+        concurrent=concurrent,
         console=console,
     )
     console.print(f"[dim]Archive:[/dim] {archive_path}")

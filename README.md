@@ -96,6 +96,9 @@ musicdl download "<url>" -t video -v mp4 --max-height 1080
 # Full playlist into a specific folder
 musicdl download "https://music.youtube.com/playlist?list=PLxxxx" -o ./music
 
+# Parallel — bulk-download a playlist with 8 workers (fast internet → much quicker)
+musicdl download "<playlist-url>" -j 8
+
 # Skip cover art and metadata
 musicdl download "<url>" --no-thumbnail --no-metadata
 ```
@@ -110,6 +113,7 @@ musicdl download "<url>" --no-thumbnail --no-metadata
 | `-o`/`--output`        | `downloads` | Output directory                                    |
 | `--thumbnail`          | on          | Embed cover art                                     |
 | `--metadata`           | on          | Embed metadata (title, artist...)                   |
+| `-j`/`--concurrent`    | `1`         | Parallel workers for playlists (4–8 = much faster)  |
 
 ### `sync` — only what's new
 
@@ -119,8 +123,8 @@ Like `download`, but it keeps a **record file** with the IDs already downloaded.
 # Keep your Liked Music in sync
 musicdl sync
 
-# Another playlist
-musicdl sync "https://music.youtube.com/playlist?list=PLxxxx" -o ./music -a mp3
+# Another playlist, with 8 parallel workers
+musicdl sync "https://music.youtube.com/playlist?list=PLxxxx" -o ./music -a mp3 -j 8
 
 # Custom archive file
 musicdl sync "<url>" --archive ./state/seen.txt
@@ -157,6 +161,7 @@ musicdl transcripts "<url>" -l es -l en -l pt
 | `--auto`        | on                                   | Include auto-generated subtitles             |
 | `-f`/`--format` | `srt`                                | `srt`, `vtt`, `ass`, `lrc`                   |
 | `--archive`     | `<output>/.musicdl-archive.txt`      | Re-runnable: skips already-fetched items     |
+| `-j`/`--concurrent` | `1`                              | Parallel workers for playlists               |
 
 ## Development
 
