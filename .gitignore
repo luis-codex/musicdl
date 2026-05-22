@@ -18,7 +18,7 @@ wheels/
 .vscode/
 .idea/
 
-# musicdl runtime artifacts
+# lumen-dlp runtime artifacts
 downloads/
 transcripts/
 *.m4a
@@ -33,4 +33,4 @@ transcripts/
 *.vtt
 *.ass
 *.lrc
-.musicdl-archive.txt
+.lumen-dlp-archive.txt

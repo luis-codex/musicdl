@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from rich.table import Table
 
-from musicdl.domain import Track
+from lumen_dlp.domain import Track
 
 
 def render_tracks(tracks: list[Track], title: str | None = None) -> Table:

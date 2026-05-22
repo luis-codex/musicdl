@@ -1,13 +1,13 @@
 [project]
-name = "musicdl"
+name = "lumen-dlp"
 version = "0.1.0"
-description = "YouTube Music CLI — list, download, sync, and grab transcripts from your playlists."
+description = "Universal media downloader for YouTube, X, TikTok, Instagram and 1000+ sites. Powered by yt-dlp + ffmpeg."
 readme = "README.md"
 license = "MIT"
 authors = [
     { name = "luis-codex", email = "luisprograming0@gmail.com" }
 ]
-keywords = ["youtube-music", "yt-dlp", "music", "downloader", "cli", "playlist"]
+keywords = ["yt-dlp", "ffmpeg", "downloader", "video", "audio", "youtube", "tiktok", "instagram", "twitter", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Video",
     "Topic :: Utilities",
 ]
 requires-python = ">=3.14"
@@ -28,12 +29,12 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/luis-codex/musicdl"
-Repository = "https://github.com/luis-codex/musicdl"
-Issues = "https://github.com/luis-codex/musicdl/issues"
+Homepage = "https://github.com/luis-codex/lumen-dlp"
+Repository = "https://github.com/luis-codex/lumen-dlp"
+Issues = "https://github.com/luis-codex/lumen-dlp/issues"
 
 [project.scripts]
-musicdl = "musicdl:main"
+lumen-dlp = "lumen_dlp:main"
 
 [build-system]
 requires = ["uv_build>=0.11.11,<0.12.0"]

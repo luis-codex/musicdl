@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 
 from rich.console import Console
 
-from musicdl.domain import Command, CookieSource, Track
-from musicdl.infrastructure import YtDlpClient
-from musicdl.presentation.rendering import render_tracks
+from lumen_dlp.domain import Command, CookieSource, Track
+from lumen_dlp.infrastructure import YtDlpClient
+from lumen_dlp.presentation.rendering import render_tracks
 
 
 @dataclass

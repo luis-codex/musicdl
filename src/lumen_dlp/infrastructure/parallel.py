@@ -15,7 +15,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from musicdl.infrastructure.archive import append_id, read_ids
+from lumen_dlp.infrastructure.archive import append_id, read_ids
 
 Worker = Callable[[dict], None]
 """Function that downloads a single entry. Receives the yt-dlp entry dict."""

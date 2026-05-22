@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import yt_dlp
 
-from musicdl.domain import CookieSource
+from lumen_dlp.domain import CookieSource
 
 
 @dataclass(frozen=True, slots=True)

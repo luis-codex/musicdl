@@ -9,12 +9,12 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from musicdl.application import (
+from lumen_dlp.application import (
     DownloadMediaCommand,
     DownloadTranscriptsCommand,
     ListPlaylistCommand,
 )
-from musicdl.domain import (
+from lumen_dlp.domain import (
     AudioFormat,
     CookieSource,
     MediaType,
@@ -27,13 +27,13 @@ for stream in (sys.stdout, sys.stderr):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
 PLAYLIST_URL = "https://music.youtube.com/playlist?list=LM"
-DEFAULT_BROWSER = os.environ.get("MUSICDL_BROWSER", "firefox")
-DEFAULT_PROFILE = os.environ.get("MUSICDL_BROWSER_PROFILE", "")
+DEFAULT_BROWSER = os.environ.get("LUMEN_DLP_BROWSER", "firefox")
+DEFAULT_PROFILE = os.environ.get("LUMEN_DLP_BROWSER_PROFILE", "")
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="YouTube Music helpers — list, download (audio/video), sync, and grab transcripts.",
+    help="Universal media downloader (YouTube, X, TikTok, Instagram, 1000+ sites). Powered by yt-dlp + ffmpeg.",
 )
 console = Console()
 
@@ -65,7 +65,7 @@ ArchiveOpt = Annotated[
     Path | None,
     typer.Option(
         "--archive",
-        help="Archive file tracking downloaded IDs. Defaults to <output>/.musicdl-archive.txt.",
+        help="Archive file tracking downloaded IDs. Defaults to <output>/.lumen-dlp-archive.txt.",
     ),
 ]
 ConcurrentOpt = Annotated[
@@ -186,7 +186,7 @@ def sync(
     concurrent: ConcurrentOpt = 1,
 ) -> None:
     """Download only new items from a playlist, skipping anything already downloaded."""
-    archive_path = archive if archive is not None else output / ".musicdl-archive.txt"
+    archive_path = archive if archive is not None else output / ".lumen-dlp-archive.txt"
     command = _build_download(
         url=url,
         cookies=_cookies(ctx),
@@ -223,7 +223,7 @@ def transcripts(
     concurrent: ConcurrentOpt = 1,
 ) -> None:
     """Download transcripts/subtitles from a video or playlist (when available)."""
-    archive_path = archive if archive is not None else output / ".musicdl-archive.txt"
+    archive_path = archive if archive is not None else output / ".lumen-dlp-archive.txt"
     command = DownloadTranscriptsCommand(
         url=url,
         cookies=_cookies(ctx),
