@@ -1,175 +1,178 @@
 # musicdl
 
-CLI para trabajar con tus playlists de YouTube Music desde la terminal — listar, descargar (audio o video, en el formato que quieras), sincronizar y bajar transcripciones. Usa las cookies de tu navegador, así que funciona con playlists privadas (incluida tu **Liked Music**).
+A command-line tool for working with your YouTube Music playlists — list, download (audio or video, in the format you choose), keep them in sync, and grab transcripts. It reads cookies directly from your browser, so it works with private playlists (including your **Liked Music**).
 
-Construido sobre [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+Built on top of [yt-dlp](https://github.com/yt-dlp/yt-dlp).
 
-## Instalación
+## Installation
 
-Requiere Python ≥ 3.14 (lo provisiona `uv` automáticamente) y [`ffmpeg`](https://ffmpeg.org/) en el `PATH`.
+Requires Python ≥ 3.14 (provisioned automatically by `uv`) and [`ffmpeg`](https://ffmpeg.org/) on your `PATH`.
 
 ```bash
-# Desde GitHub (recomendado)
+# From GitHub (recommended)
 uv tool install git+https://github.com/luis-codex/musicdl
 
-# O desde un clon local
+# Or from a local clone
 git clone https://github.com/luis-codex/musicdl
 cd musicdl
 uv tool install .
 ```
 
-Una vez instalado, `musicdl` queda disponible globalmente:
+Once installed, `musicdl` is available globally:
 
 ```bash
 musicdl --help
 ```
 
-Para actualizar:
+To upgrade:
 
 ```bash
 uv tool install git+https://github.com/luis-codex/musicdl --reinstall
 ```
 
-## Configurar cookies
+## Configure cookies
 
-YouTube Music necesita tus cookies para acceder a playlists privadas (Liked Music, Library, etc.). `musicdl` las lee directamente de tu navegador.
+YouTube Music needs your cookies to access private playlists (Liked Music, Library, etc.). `musicdl` reads them straight from your browser.
 
 ```bash
-# Firefox (recomendado en Windows)
+# Firefox (recommended on Windows)
 musicdl --browser firefox list
 
-# Otros: chrome, brave, edge, opera, vivaldi, safari, chromium...
+# Others: chrome, brave, edge, opera, vivaldi, safari, chromium...
 musicdl --browser chrome list
 ```
 
-Si usas un fork de Firefox (Zen, Waterfox, LibreWolf) o un perfil custom, indica la ruta:
+If you use a Firefox fork (Zen, Waterfox, LibreWolf) or a custom profile, pass the path explicitly:
 
 ```bash
-musicdl --browser firefox --profile "C:\Users\<tu_usuario>\AppData\Roaming\zen\Profiles\xxxx.Default" list
+musicdl --browser firefox --profile "C:\Users\<you>\AppData\Roaming\zen\Profiles\xxxx.Default" list
 ```
 
-O configúralo una vez vía variables de entorno:
+Or configure it once via environment variables:
 
-| Variable                    | Default     | Ejemplo                                                                  |
+| Variable                    | Default     | Example                                                                  |
 | --------------------------- | ----------- | ------------------------------------------------------------------------ |
 | `MUSICDL_BROWSER`           | `firefox`   | `chrome`                                                                 |
-| `MUSICDL_BROWSER_PROFILE`   | *(vacío)*   | `C:\Users\luisp\AppData\Roaming\zen\Profiles\xxxx.Default (release)`     |
+| `MUSICDL_BROWSER_PROFILE`   | *(empty)*   | `C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)`       |
 
-> ⚠️ **Windows + Chromium (Chrome/Brave/Edge):** desde 2024 esos navegadores usan **Application-Bound Encryption** y `yt-dlp` no puede descifrar sus cookies ([yt-dlp#10927](https://github.com/yt-dlp/yt-dlp/issues/10927)). Usa Firefox/Zen o exporta un `cookies.txt` manualmente.
+> ⚠️ **Windows + Chromium (Chrome/Brave/Edge):** since 2024 these browsers use **Application-Bound Encryption** and `yt-dlp` cannot decrypt their cookies ([yt-dlp#10927](https://github.com/yt-dlp/yt-dlp/issues/10927)). Use Firefox/Zen or export a `cookies.txt` manually.
 
-## Comandos
+## Commands
 
 ```bash
 musicdl --help
 ```
 
-### `list` — listar canciones de una playlist
+### `list` — list playlist songs
 
 ```bash
-# Tu Liked Music (default)
+# Your Liked Music (default)
 musicdl list
 
-# Otra playlist
+# Another playlist
 musicdl list "https://music.youtube.com/playlist?list=PLxxxx"
 ```
 
-### `download` — descargar audio o video
+### `download` — download audio or video
 
-Descarga un video o playlist completa en el formato elegido. Incluye carátula y metadata embebidos por defecto.
+Downloads a video or full playlist in the chosen format. Cover art and metadata are embedded by default.
 
 ```bash
-# Audio M4A (default — sin re-encodear, preserva el AAC original)
+# Default: M4A audio (no re-encoding, preserves the original AAC)
 musicdl download "https://youtu.be/<id>"
 
-# MP3 a 192 kbps
+# No URL → falls back to your Liked Music
+musicdl download
+
+# MP3 at 192 kbps
 musicdl download "<url>" -a mp3 -q 192
 
 # FLAC (lossless)
 musicdl download "<url>" -a flac
 
-# Video MP4 1080p máx
+# Video MP4 capped at 1080p
 musicdl download "<url>" -t video -v mp4 --max-height 1080
 
-# Toda una playlist a una carpeta concreta
+# Full playlist into a specific folder
 musicdl download "https://music.youtube.com/playlist?list=PLxxxx" -o ./music
 
-# Sin carátula ni metadata
+# Skip cover art and metadata
 musicdl download "<url>" --no-thumbnail --no-metadata
 ```
 
-| Opción                 | Default     | Descripción                                         |
+| Option                 | Default     | Description                                         |
 | ---------------------- | ----------- | --------------------------------------------------- |
-| `-t`/`--type`          | `audio`     | `audio` o `video`                                   |
+| `-t`/`--type`          | `audio`     | `audio` or `video`                                  |
 | `-a`/`--audio-format`  | `m4a`       | `mp3`, `m4a`, `opus`, `flac`, `wav`, `vorbis`       |
 | `-v`/`--video-format`  | `mp4`       | `mp4`, `mkv`, `webm`                                |
-| `-q`/`--quality`       | `0`         | Audio: `0` mejor → `9` peor, o kbps (`192`)         |
-| `--max-height`         | sin límite  | Cap de resolución de video (`1080`, `720`...)       |
-| `-o`/`--output`        | `downloads` | Carpeta de salida                                   |
-| `--thumbnail`          | activado    | Embeber carátula                                    |
-| `--metadata`           | activado    | Embeber metadata (título, artista...)               |
+| `-q`/`--quality`       | `0`         | Audio: `0` best → `9` worst, or kbps (`192`)        |
+| `--max-height`         | uncapped    | Cap video resolution (`1080`, `720`...)             |
+| `-o`/`--output`        | `downloads` | Output directory                                    |
+| `--thumbnail`          | on          | Embed cover art                                     |
+| `--metadata`           | on          | Embed metadata (title, artist...)                   |
 
-### `sync` — solo lo nuevo
+### `sync` — only what's new
 
-Como `download`, pero lleva un **archivo de registro** con los IDs ya descargados. Re-ejecutar = solo baja lo nuevo.
+Like `download`, but it keeps a **record file** with the IDs already downloaded. Re-run it to fetch only what's new.
 
 ```bash
-# Mantén tu Liked Music sincronizada
+# Keep your Liked Music in sync
 musicdl sync
 
-# Otra playlist
+# Another playlist
 musicdl sync "https://music.youtube.com/playlist?list=PLxxxx" -o ./music -a mp3
 
-# Archivo de registro custom
+# Custom archive file
 musicdl sync "<url>" --archive ./state/seen.txt
 ```
 
-| Opción       | Default                              | Descripción                                |
+| Option       | Default                              | Description                                |
 | ------------ | ------------------------------------ | ------------------------------------------ |
-| `--archive`  | `<output>/.musicdl-archive.txt`      | Archivo de IDs ya descargados              |
+| `--archive`  | `<output>/.musicdl-archive.txt`      | File tracking already-downloaded IDs       |
 
-> Acepta también los flags de `download`.
+> Also accepts every `download` flag.
 
-### `transcripts` — descargar subtítulos / letras
+### `transcripts` — download subtitles / lyrics
 
-Baja los subtítulos disponibles (manuales y auto-generados) de un video o playlist completa.
+Pulls the available subtitles (manual and auto-generated) from a video or full playlist.
 
 ```bash
-# Un solo video
+# A single video
 musicdl transcripts "https://youtu.be/<id>"
 
-# Toda una playlist a otro directorio
+# Full playlist to a different folder
 musicdl transcripts "https://music.youtube.com/playlist?list=LM" -o ./subs
 
-# Solo español, sin auto-generados, formato VTT
+# Spanish only, no auto-generated, VTT format
 musicdl transcripts "<url>" -l es --no-auto -f vtt
 
-# Varios idiomas (repite -l)
+# Multiple languages (repeat -l)
 musicdl transcripts "<url>" -l es -l en -l pt
 ```
 
-| Opción          | Default                              | Descripción                                  |
+| Option          | Default                              | Description                                  |
 | --------------- | ------------------------------------ | -------------------------------------------- |
-| `-o`/`--output` | `transcripts`                        | Carpeta de salida                            |
-| `-l`/`--lang`   | `es`, `en`                           | Idiomas a intentar (repetible)               |
-| `--auto`        | activado                             | Incluir subtítulos auto-generados            |
+| `-o`/`--output` | `transcripts`                        | Output directory                             |
+| `-l`/`--lang`   | `es`, `en`                           | Languages to try (repeatable)                |
+| `--auto`        | on                                   | Include auto-generated subtitles             |
 | `-f`/`--format` | `srt`                                | `srt`, `vtt`, `ass`, `lrc`                   |
-| `--archive`     | `<output>/.musicdl-archive.txt`      | Re-ejecutable: salta los ya bajados          |
+| `--archive`     | `<output>/.musicdl-archive.txt`      | Re-runnable: skips already-fetched items     |
 
-## Desarrollo
+## Development
 
 ```bash
 git clone https://github.com/luis-codex/musicdl
 cd musicdl
 uv sync
 
-# Modo editable (cambios en el código se reflejan al instante)
+# Editable install (changes in source reflect instantly)
 uv tool install -e .
 
-# Lint y formato
+# Lint and format
 uv run ruff check . --fix
 uv run ruff format .
 ```
 
-## Licencia
+## License
 
 MIT
