@@ -1,8 +1,49 @@
 # musicdl
 
-A command-line tool for working with your YouTube Music playlists — list, download (audio or video, in the format you choose), keep them in sync, and grab transcripts. It reads cookies directly from your browser, so it works with private playlists (including your **Liked Music**).
+> **Your YouTube Music library, on your disk. Incrementally synced. Tagged. Done.**
 
-Built on top of [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+A no-nonsense CLI to mirror your YouTube Music playlists — including private ones like **Liked Music** — into plain audio files you actually own. Built on top of [yt-dlp](https://github.com/yt-dlp/yt-dlp) and designed to be re-run on a schedule.
+
+```bash
+# One command. Run it weekly. Only new tracks get downloaded.
+musicdl sync -o ./music -a mp3 -q 0 -j 8
+```
+
+---
+
+## Why musicdl
+
+There are a hundred YouTube downloaders. Most of them stop being useful the moment you want to:
+
+- **Access your private playlists.** musicdl reads cookies straight from your browser — no manual `cookies.txt` exports, no re-login hassle. Liked Music works out of the box.
+- **Keep a library in sync, not re-download it.** `sync` maintains an archive file: re-run it tomorrow, next week, or from cron, and only the new tracks come down. Think `rsync` for music.
+- **Get files that don't look like garbage in your player.** Cover art and full metadata (title, artist, album) are embedded by default. No post-processing scripts.
+- **Pick the format you actually want.** MP3 (VBR or CBR), M4A (no re-encoding — straight AAC out of YouTube), FLAC, OPUS, video MP4/MKV/WebM. Cap resolution if you need to.
+- **Go fast.** `-j 8` runs eight downloads in parallel. A 500-track playlist finishes while you grab coffee.
+- **Pull transcripts too.** Subtitles, lyrics tracks, auto-generated captions — single video or whole playlist, multiple languages.
+
+Built for people who'd rather own their music library than rent access to it.
+
+---
+
+## Quick start
+
+```bash
+# 1. Install
+uv tool install git+https://github.com/luis-codex/musicdl
+
+# 2. Tell it which browser holds your YouTube Music session (once)
+$env:MUSICDL_BROWSER = "firefox"   # PowerShell
+# export MUSICDL_BROWSER=firefox   # bash/zsh
+
+# 3. Mirror your Liked Music in MP3 320kbps with covers + metadata
+musicdl sync -o ./music -a mp3 -q 0 -j 8
+
+# 4. A week later, run the exact same command. Only new songs download.
+musicdl sync -o ./music -a mp3 -q 0 -j 8
+```
+
+---
 
 ## Installation
 
@@ -32,7 +73,7 @@ uv tool install git+https://github.com/luis-codex/musicdl --reinstall
 
 ## Configure cookies
 
-YouTube Music needs your cookies to access private playlists (Liked Music, Library, etc.). `musicdl` reads them straight from your browser.
+YouTube Music needs your cookies to access private playlists (Liked Music, Library, etc.). `musicdl` reads them straight from your browser — no exports, no manual files.
 
 ```bash
 # Firefox (recommended on Windows)
@@ -140,7 +181,7 @@ musicdl download "<url>" --no-thumbnail --no-metadata
 
 ### `sync` — only what's new
 
-Like `download`, but it keeps a **record file** with the IDs already downloaded. Re-run it to fetch only what's new.
+Like `download`, but it keeps a **record file** with the IDs already downloaded. Re-run it to fetch only what's new. Pair it with `cron` / Task Scheduler and forget about it.
 
 ```bash
 # Keep your Liked Music in sync
@@ -158,6 +199,15 @@ musicdl sync "<url>" --archive ./state/seen.txt
 | `--archive`  | `<output>/.musicdl-archive.txt`      | File tracking already-downloaded IDs       |
 
 > Also accepts every `download` flag.
+
+**Maintenance tips:**
+
+| Goal                                      | How                                                              |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| Re-download a track you deleted           | Remove its line from `.musicdl-archive.txt`, then `sync` again   |
+| Force a full re-sync                      | Delete `.musicdl-archive.txt` and re-run                         |
+| Run it daily on Windows                   | `schtasks /create /sc DAILY /tn musicdl-sync /tr "musicdl sync …"` |
+| Run it daily on macOS/Linux               | Add `musicdl sync …` to your crontab                             |
 
 ### `transcripts` — download subtitles / lyrics
 
