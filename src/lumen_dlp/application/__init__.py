@@ -1,9 +1,7 @@
-from lumen_dlp.application.download_media import DownloadMediaCommand
-from lumen_dlp.application.download_transcripts import DownloadTranscriptsCommand
-from lumen_dlp.application.list_playlist import ListPlaylistCommand
+from lumen_dlp.application.fetch import FetchCommand
+from lumen_dlp.application.inspect import InspectCommand
 
 __all__ = [
-    "DownloadMediaCommand",
-    "DownloadTranscriptsCommand",
-    "ListPlaylistCommand",
+    "FetchCommand",
+    "InspectCommand",
 ]

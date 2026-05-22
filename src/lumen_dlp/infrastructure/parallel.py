@@ -67,12 +67,12 @@ def run_parallel(
                 title = entry.get("title") or entry.get("id") or "?"
                 try:
                     future.result()
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     failures.append((title, str(exc)))
                     console.print(f"[red]✗[/red] {title} — {exc}")
                 else:
                     if archive_file and entry.get("id"):
-                        append_id(archive_file, entry["id"], archive_lock)
+                        append_id(archive_file, entry, archive_lock)
                     console.print(f"[green]✓[/green] {title}")
                 finally:
                     progress.advance(overall)

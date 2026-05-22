@@ -4,15 +4,6 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)
-class CookieSource:
-    browser: str
-    profile: str | None = None
-
-    def as_ydl_tuple(self) -> tuple:
-        return (self.browser, self.profile) if self.profile else (self.browser,)
-
-
-@dataclass(frozen=True, slots=True)
 class Track:
     index: int
     title: str
@@ -35,3 +26,9 @@ class Track:
             artist=artist,
             duration=entry.get("duration"),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class Subtitle:
+    lang: str
+    is_auto: bool

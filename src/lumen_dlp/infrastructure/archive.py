@@ -15,6 +15,11 @@ def read_ids(archive: Path) -> set[str]:
     return ids
 
 
-def append_id(archive: Path, video_id: str, lock: threading.Lock) -> None:
+def append_id(archive: Path, entry: dict, lock: threading.Lock) -> None:
+    """Append a yt-dlp archive line for the given entry. Format: ``<extractor> <id>``."""
+    video_id = entry.get("id")
+    if not video_id:
+        return
+    extractor = (entry.get("ie_key") or entry.get("extractor") or "unknown").lower()
     with lock, archive.open("a", encoding="utf-8") as f:
-        f.write(f"youtube {video_id}\n")
+        f.write(f"{extractor} {video_id}\n")

@@ -2,13 +2,16 @@
 
 > **Download anything, from anywhere. Sync your YouTube Music library on autopilot.**
 
-A no-nonsense CLI for grabbing media off the internet — YouTube, X, TikTok, Instagram, and the [1000+ sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) that [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports — with [ffmpeg](https://ffmpeg.org/) doing the heavy lifting on formats. Plus a killer YouTube Music sync mode that mirrors your private playlists (Liked Music included) to disk.
+A no-nonsense CLI for grabbing media off the internet — YouTube, X, TikTok, Instagram, and the [1000+ sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md) that [yt-dlp](https://github.com/yt-dlp/yt-dlp) supports — with [ffmpeg](https://ffmpeg.org/) doing the heavy lifting on formats. You pick what you want (audio, video, subs, or all at once), in whatever format, and it just works. Cookies are handled automatically: anonymous when the site is public, your browser's session when it isn't.
 
 ```bash
-# Grab a video from anywhere
-lumen-dlp download "https://www.tiktok.com/@user/video/123"
+# Grab a TikTok — no auth, no config
+lumen-dlp get "https://www.tiktok.com/@user/video/123" --audio -a mp3
 
-# Mirror your Liked Music. Run weekly. Only new tracks download.
+# A YouTube video with audio, video, and subtitles in one shot
+lumen-dlp get "https://youtu.be/<id>" --all
+
+# Mirror your Liked Music. Run it weekly. Only new tracks download.
 lumen-dlp sync -o ./music -a mp3 -q 0 -j 8
 ```
 
@@ -16,34 +19,37 @@ lumen-dlp sync -o ./music -a mp3 -q 0 -j 8
 
 ## How it works
 
-A URL goes in, a tagged file lands on disk. Two stages do the work: **Download** (yt-dlp pulls bytes from whatever site you threw at it) and **Transform** (ffmpeg re-muxes, transcodes, and embeds metadata + cover art).
+A URL goes in, the file(s) you asked for land on disk. Two stages do the work: **Download** (yt-dlp pulls bytes from whatever site you threw at it) and **Transform** (ffmpeg re-muxes, transcodes, embeds metadata + cover art). Auth is invisible — anonymous first, browser cookies on demand.
 
 ```mermaid
 flowchart LR
-    U([User]) -->|"lumen-dlp <cmd> &lt;url&gt;"| CLI[CLI<br/>typer]
-    CLI --> UC[Use case<br/>list · download · sync · transcripts]
-    UC --> CK[(Browser cookies<br/>firefox · chrome · ...)]
-    UC --> DL[["**Download**<br/>yt-dlp"]]
+    U([User]) -->|"lumen-dlp get &lt;url&gt; --audio --video --subs"| CLI[CLI<br/>typer]
+    CLI -->|OutputSpec + AuthStrategy| UC[FetchCommand<br/>· InspectCommand]
+    UC --> YDC[YtDlpClient]
+    YDC -->|1° try| ANON((Anonymous))
+    ANON -. auth needed .-> COOK((Browser cookies<br/>auto-detected))
+    YDC --> DL[["**Download**<br/>yt-dlp"]]
     DL -->|any of 1000+ sites| NET((Internet))
     DL --> XF[["**Transform**<br/>ffmpeg"]]
-    XF --> OUT[(Files on disk<br/>mp3 · m4a · flac · mp4 · srt)]
+    XF --> OUT[(Title.mp3<br/>Title.mp4<br/>Title.es.srt)]
     UC -. sync mode .-> ARC[(.lumen-dlp-archive.txt)]
     ARC -. skip seen IDs .-> UC
 ```
+
+Audio, video and subs are produced from a **single yt-dlp invocation per URL** — one network pass, ffmpeg postprocessing handles the rest locally.
 
 ---
 
 ## Why lumen-dlp
 
-There are a hundred yt-dlp wrappers. Most of them stop being useful the moment you want to:
+There are a hundred yt-dlp wrappers. Most stop being useful the moment you want to:
 
-- **Pull from any site, in any format.** YouTube, X (Twitter), TikTok, Instagram, Twitch, Vimeo, SoundCloud, Bandcamp... if yt-dlp supports it, lumen-dlp downloads it.
-- **Access your private playlists.** lumen-dlp reads cookies straight from your browser — no manual `cookies.txt` exports, no re-login hassle. YouTube Music's Liked Music works out of the box.
-- **Keep a library in sync, not re-download it.** `sync` maintains an archive file: re-run it tomorrow, next week, or from cron, and only new items come down. Think `rsync` for media.
+- **Pull from any site, in any combo.** Audio, video, subtitles — or all three from the same URL in one command. YouTube, X (Twitter), TikTok, Instagram, Twitch, Vimeo, SoundCloud, Bandcamp... if yt-dlp supports it, lumen-dlp grabs it.
+- **Stop thinking about auth.** Try anonymous; on a login-required error, retry transparently with cookies from your browser (auto-detected — Firefox, Chrome, Brave, Edge, Vivaldi). Your YouTube Music Liked Music, your private X bookmarks, your saved Instagram posts — work without exports or `cookies.txt`.
+- **Keep a library in sync, not re-download it.** `sync` maintains an archive file: re-run from cron / Task Scheduler and only new items come down. Think `rsync` for media.
 - **Get files that don't look like garbage in your player.** Cover art and full metadata (title, artist, album) are embedded by default. No post-processing scripts.
-- **Pick the format you actually want.** MP3 (VBR or CBR), M4A (no re-encoding — straight AAC out of YouTube), FLAC, OPUS, video MP4/MKV/WebM. Cap resolution if you need to.
+- **Pick the format you actually want.** MP3 (VBR or CBR), M4A (no re-encoding — straight AAC out of YouTube), FLAC, OPUS, video MP4/MKV/WebM. Cap resolution if you need to. Subs in SRT/VTT/ASS/LRC.
 - **Go fast.** `-j 8` runs eight downloads in parallel. A 500-item playlist finishes while you grab coffee.
-- **Pull transcripts too.** Subtitles, lyrics tracks, auto-generated captions — single video or whole playlist, multiple languages.
 
 Built for people who'd rather own their media than rent access to it.
 
@@ -55,21 +61,19 @@ Built for people who'd rather own their media than rent access to it.
 # 1. Install
 uv tool install git+https://github.com/luis-codex/lumen-dlp
 
-# 2. (Optional) Tell it which browser holds your YouTube Music session
-$env:LUMEN_DLP_BROWSER = "firefox"   # PowerShell
-# export LUMEN_DLP_BROWSER=firefox   # bash/zsh
+# 2. Download anything — no config required
+lumen-dlp get "https://www.tiktok.com/@user/video/123" --audio -a mp3
+lumen-dlp get "https://youtu.be/<id>" --video --max-height 1080
+lumen-dlp get "https://x.com/user/status/123" --all
 
-# 3. Download anything
-lumen-dlp download "https://youtu.be/<id>"
-lumen-dlp download "https://www.tiktok.com/@user/video/123"
-lumen-dlp download "https://x.com/user/status/123"
-
-# 4. Or mirror your Liked Music in MP3 320kbps with covers + metadata
+# 3. Mirror your Liked Music in MP3 320kbps with covers + metadata
 lumen-dlp sync -o ./music -a mp3 -q 0 -j 8
 
-# A week later, run the exact same command. Only new songs download.
+# A week later, same command. Only new songs download.
 lumen-dlp sync -o ./music -a mp3 -q 0 -j 8
 ```
+
+For private/age-restricted content, the first failed attempt triggers a transparent retry using cookies from your logged-in browser. You don't have to do anything — just stay logged in where you normally are.
 
 ---
 
@@ -87,67 +91,13 @@ cd lumen-dlp
 uv tool install .
 ```
 
-Once installed, `lumen-dlp` is available globally:
-
-```bash
-lumen-dlp --help
-```
-
 To upgrade:
 
 ```bash
 uv tool install git+https://github.com/luis-codex/lumen-dlp --reinstall
 ```
 
-## Configure cookies
-
-Some sites — YouTube Music in particular — need your cookies to access private content (Liked Music, Library, age-restricted videos, etc.). `lumen-dlp` reads them straight from your browser — no exports, no manual files.
-
-```bash
-# Firefox (recommended on Windows)
-lumen-dlp --browser firefox list
-
-# Others: chrome, brave, edge, opera, vivaldi, safari, chromium...
-lumen-dlp --browser chrome list
-```
-
-If you use a Firefox fork (Zen, Waterfox, LibreWolf) or a custom profile, pass the path explicitly:
-
-```bash
-lumen-dlp --browser firefox --profile "C:\Users\<you>\AppData\Roaming\zen\Profiles\xxxx.Default" list
-```
-
-Or configure it once via environment variables:
-
-| Variable                        | Default     | Example                                                                  |
-| ------------------------------- | ----------- | ------------------------------------------------------------------------ |
-| `LUMEN_DLP_BROWSER`             | `firefox`   | `chrome`                                                                 |
-| `LUMEN_DLP_BROWSER_PROFILE`     | *(empty)*   | `C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)`       |
-
-**Windows (PowerShell)** — for the current session:
-
-```powershell
-$env:LUMEN_DLP_BROWSER = "firefox"
-$env:LUMEN_DLP_BROWSER_PROFILE = "C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)"
-```
-
-To persist them across reboots (recommended), set them as User variables and open a **new** terminal:
-
-```powershell
-[Environment]::SetEnvironmentVariable("LUMEN_DLP_BROWSER", "firefox", "User")
-[Environment]::SetEnvironmentVariable("LUMEN_DLP_BROWSER_PROFILE", "C:\Users\you\AppData\Roaming\zen\Profiles\xxxx.Default (release)", "User")
-```
-
-Alternative GUI: `Win + R` → `sysdm.cpl` → *Advanced* → *Environment Variables…* → add under *User variables*.
-
-**macOS / Linux (bash/zsh)** — add to `~/.bashrc` or `~/.zshrc`:
-
-```bash
-export LUMEN_DLP_BROWSER=firefox
-export LUMEN_DLP_BROWSER_PROFILE="$HOME/.mozilla/firefox/xxxx.default-release"
-```
-
-> ⚠️ **Windows + Chromium (Chrome/Brave/Edge):** since 2024 these browsers use **Application-Bound Encryption** and `yt-dlp` cannot decrypt their cookies ([yt-dlp#10927](https://github.com/yt-dlp/yt-dlp/issues/10927)). Use Firefox/Zen or export a `cookies.txt` manually.
+---
 
 ## Commands
 
@@ -155,118 +105,149 @@ export LUMEN_DLP_BROWSER_PROFILE="$HOME/.mozilla/firefox/xxxx.default-release"
 lumen-dlp --help
 ```
 
-### `list` — list playlist songs
+Three verbs: `get` (one-shot), `sync` (incremental + archive), `list` (inspect a URL without downloading).
+
+### `get` — download one URL
+
+Compose what you want with `--audio`, `--video`, `--subs`, or `--all`. With no flag at all, defaults to audio M4A.
 
 ```bash
-# Your YouTube Music Liked Music (default)
-lumen-dlp list
+# Default: audio M4A
+lumen-dlp get "https://youtu.be/<id>"
 
-# Another playlist
-lumen-dlp list "https://music.youtube.com/playlist?list=PLxxxx"
+# Multi-platform — same command shape
+lumen-dlp get "https://www.tiktok.com/@user/video/123" --audio
+lumen-dlp get "https://x.com/user/status/123" --video
+
+# Choose format and quality
+lumen-dlp get "<url>" --audio -a mp3 -q 320
+lumen-dlp get "<url>" --audio -a flac
+lumen-dlp get "<url>" --video -v mp4 --max-height 1080
+
+# Combine outputs — one network pass, multiple files
+lumen-dlp get "<url>" --audio -a mp3 --video --subs
+lumen-dlp get "<url>" --all                     # shortcut for audio + video + subs
+
+# Subtitles in chosen langs (default = all available)
+lumen-dlp get "<url>" --subs -l es,en,pt
+lumen-dlp get "<url>" --subs --subs-format vtt --no-auto
+
+# Playlists — parallel
+lumen-dlp get "https://music.youtube.com/playlist?list=PLxxxx" --audio -a mp3 -j 8
+
+# Strip thumbnail / metadata if you don't want them embedded
+lumen-dlp get "<url>" --audio --no-thumbnail --no-metadata
 ```
 
-### `download` — download audio or video
+| Flag                  | Default     | Description                                         |
+| --------------------- | ----------- | --------------------------------------------------- |
+| `--audio`             | (implicit when no flag) | Request audio                              |
+| `-a`/`--audio-format` | `m4a`       | `mp3`, `m4a`, `opus`, `flac`, `wav`, `vorbis`       |
+| `-q`/`--quality`      | `0`         | Audio: `0` best → `9` worst, or kbps (`192`, `320`) |
+| `--video`             | off         | Request video                                       |
+| `-v`/`--video-format` | `mp4`       | `mp4`, `mkv`, `webm`                                |
+| `--max-height`        | uncapped    | Cap video resolution (`1080`, `720`...)             |
+| `--subs`              | off         | Request subtitles                                   |
+| `--subs-format`       | `srt`       | `srt`, `vtt`, `ass`, `lrc`                          |
+| `-l`/`--lang`         | *all available* | Comma-separated langs (`es,en,pt`)              |
+| `--no-auto`           | off         | Exclude auto-generated subtitles                    |
+| `--all`               | off         | Shortcut for `--audio --video --subs`               |
+| `-o`/`--output`       | `downloads` | Output directory                                    |
+| `--no-thumbnail`      | (embed on)  | Skip embedding cover art                            |
+| `--no-metadata`       | (embed on)  | Skip embedding title/artist tags                    |
+| `-j`/`--concurrent`   | `1`         | Parallel workers for playlists (4–8 = much faster)  |
+| `--browser`           | auto        | Force cookies from a specific browser               |
+| `--profile`           | —           | Browser profile path (for Firefox forks)            |
+| `--no-cookies`        | off         | Never use cookies, even on auth-needed errors       |
 
-Downloads a video or full playlist in the chosen format. Works with any yt-dlp-supported site. Cover art and metadata are embedded by default.
+### `sync` — incremental download
 
-```bash
-# Default: M4A audio (no re-encoding, preserves the original AAC)
-lumen-dlp download "https://youtu.be/<id>"
-
-# From TikTok, X, Instagram, etc.
-lumen-dlp download "https://www.tiktok.com/@user/video/123"
-lumen-dlp download "https://x.com/user/status/123"
-
-# No URL → falls back to your YouTube Music Liked Music
-lumen-dlp download
-
-# MP3 at 192 kbps
-lumen-dlp download "<url>" -a mp3 -q 192
-
-# FLAC (lossless)
-lumen-dlp download "<url>" -a flac
-
-# Video MP4 capped at 1080p
-lumen-dlp download "<url>" -t video -v mp4 --max-height 1080
-
-# Full playlist into a specific folder
-lumen-dlp download "https://music.youtube.com/playlist?list=PLxxxx" -o ./music
-
-# Parallel — bulk-download a playlist with 8 workers
-lumen-dlp download "<playlist-url>" -j 8
-
-# Skip cover art and metadata
-lumen-dlp download "<url>" --no-thumbnail --no-metadata
-```
-
-| Option                 | Default     | Description                                         |
-| ---------------------- | ----------- | --------------------------------------------------- |
-| `-t`/`--type`          | `audio`     | `audio` or `video`                                  |
-| `-a`/`--audio-format`  | `m4a`       | `mp3`, `m4a`, `opus`, `flac`, `wav`, `vorbis`       |
-| `-v`/`--video-format`  | `mp4`       | `mp4`, `mkv`, `webm`                                |
-| `-q`/`--quality`       | `0`         | Audio: `0` best → `9` worst, or kbps (`192`)        |
-| `--max-height`         | uncapped    | Cap video resolution (`1080`, `720`...)             |
-| `-o`/`--output`        | `downloads` | Output directory                                    |
-| `--thumbnail`          | on          | Embed cover art                                     |
-| `--metadata`           | on          | Embed metadata (title, artist...)                   |
-| `-j`/`--concurrent`    | `1`         | Parallel workers for playlists (4–8 = much faster)  |
-
-### `sync` — only what's new
-
-Like `download`, but it keeps a **record file** with the IDs already downloaded. Re-run it to fetch only what's new. Pair it with `cron` / Task Scheduler and forget about it.
+Same flags as `get`, plus `--archive`. Maintains a record file of downloaded IDs; re-running only fetches new items. Pair with `cron` / Task Scheduler.
 
 ```bash
 # Keep your Liked Music in sync
 lumen-dlp sync
 
-# Another playlist, with 8 parallel workers
-lumen-dlp sync "https://music.youtube.com/playlist?list=PLxxxx" -o ./music -a mp3 -j 8
+# Another playlist, 8 parallel workers
+lumen-dlp sync "https://music.youtube.com/playlist?list=PLxxxx" --audio -a mp3 -j 8
 
-# Custom archive file
-lumen-dlp sync "<url>" --archive ./state/seen.txt
+# Custom archive location
+lumen-dlp sync "<url>" --audio --archive ./state/seen.txt
 ```
 
-| Option       | Default                              | Description                                |
-| ------------ | ------------------------------------ | ------------------------------------------ |
-| `--archive`  | `<output>/.lumen-dlp-archive.txt`    | File tracking already-downloaded IDs       |
+| Flag        | Default                              | Description                                |
+| ----------- | ------------------------------------ | ------------------------------------------ |
+| `--archive` | `<output>/.lumen-dlp-archive.txt`    | File tracking already-downloaded IDs       |
 
-> Also accepts every `download` flag.
+> Accepts every `get` flag too.
 
 **Maintenance tips:**
 
-| Goal                                      | How                                                              |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| Re-download a track you deleted           | Remove its line from `.lumen-dlp-archive.txt`, then `sync` again |
-| Force a full re-sync                      | Delete `.lumen-dlp-archive.txt` and re-run                       |
-| Run it daily on Windows                   | `schtasks /create /sc DAILY /tn lumen-dlp-sync /tr "lumen-dlp sync …"` |
-| Run it daily on macOS/Linux               | Add `lumen-dlp sync …` to your crontab                           |
+| Goal                                      | How                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| Re-download an item you deleted           | Remove its line from `.lumen-dlp-archive.txt`, then `sync` again   |
+| Force a full re-sync                      | Delete `.lumen-dlp-archive.txt` and re-run                         |
+| Run daily on Windows                      | `schtasks /create /sc DAILY /tn lumen-dlp-sync /tr "lumen-dlp sync …"` |
+| Run daily on macOS/Linux                  | Add `lumen-dlp sync …` to your crontab                             |
 
-### `transcripts` — download subtitles / lyrics
-
-Pulls the available subtitles (manual and auto-generated) from a video or full playlist.
+### `list` — inspect without downloading
 
 ```bash
-# A single video
-lumen-dlp transcripts "https://youtu.be/<id>"
+# Single video → title, duration, available subtitles per language
+lumen-dlp list "https://youtu.be/<id>"
 
-# Full playlist to a different folder
-lumen-dlp transcripts "https://music.youtube.com/playlist?list=LM" -o ./subs
-
-# Spanish only, no auto-generated, VTT format
-lumen-dlp transcripts "<url>" -l es --no-auto -f vtt
-
-# Multiple languages (repeat -l)
-lumen-dlp transcripts "<url>" -l es -l en -l pt
+# Playlist → track list (titles, artists, durations)
+lumen-dlp list "https://music.youtube.com/playlist?list=PLxxxx"
 ```
 
-| Option          | Default                              | Description                                  |
-| --------------- | ------------------------------------ | -------------------------------------------- |
-| `-o`/`--output` | `transcripts`                        | Output directory                             |
-| `-l`/`--lang`   | `es`, `en`                           | Languages to try (repeatable)                |
-| `--auto`        | on                                   | Include auto-generated subtitles             |
-| `-f`/`--format` | `srt`                                | `srt`, `vtt`, `ass`, `lrc`                   |
-| `--archive`     | `<output>/.lumen-dlp-archive.txt`    | Re-runnable: skips already-fetched items     |
-| `-j`/`--concurrent` | `1`                              | Parallel workers for playlists               |
+Use this when you want to know *what's there* before deciding which formats / langs to grab.
+
+---
+
+## Auth: how it actually works
+
+You shouldn't need to read this section. The defaults are correct.
+
+By default, `lumen-dlp` tries to download anonymously. If the site responds with "login required" (or similar), it auto-detects an installed browser on your system (priority: **firefox → chrome → brave → edge → vivaldi**) and retries using that browser's cookies. If cookies in the first browser don't authorize either, you get a clear error message pointing to `--browser <other>`.
+
+**You'll only need to think about it when:**
+
+- You're logged into the site in a non-default browser → set `--browser <name>` (or `LUMEN_DLP_BROWSER` env var to persist).
+- You're using a Firefox fork (Zen, Waterfox, LibreWolf) → `--browser firefox --profile "<path-to-profile>"`.
+- You don't want cookies under any circumstances → `--no-cookies`.
+- You want to skip the anonymous-first round trip (e.g. for `sync` of a known-private playlist) → set `LUMEN_DLP_BROWSER` or pass `--browser`.
+
+```bash
+# Force a specific browser
+lumen-dlp get "<url>" --browser chrome
+
+# Firefox fork (Zen) with explicit profile
+lumen-dlp get "<url>" --browser firefox --profile "C:\Users\<you>\AppData\Roaming\zen\Profiles\xxxx.Default"
+
+# Skip cookies entirely
+lumen-dlp get "<url>" --no-cookies
+```
+
+**Env vars (optional)** — useful for `sync` workflows where you already know cookies are needed and want to skip the anonymous probe each run.
+
+| Variable                    | Effect                                                         |
+| --------------------------- | -------------------------------------------------------------- |
+| `LUMEN_DLP_BROWSER`         | Sets the default `--browser`. Skips the anonymous probe.       |
+| `LUMEN_DLP_BROWSER_PROFILE` | Sets the default `--profile` (path).                           |
+
+```powershell
+# Windows (PowerShell) — persistent
+[Environment]::SetEnvironmentVariable("LUMEN_DLP_BROWSER", "firefox", "User")
+```
+
+```bash
+# macOS / Linux
+export LUMEN_DLP_BROWSER=firefox
+```
+
+> ⚠️ **Windows + Chromium (Chrome/Brave/Edge):** since 2024 these browsers use Application-Bound Encryption and `yt-dlp` cannot decrypt their cookies on Windows ([yt-dlp#10927](https://github.com/yt-dlp/yt-dlp/issues/10927)). Use Firefox or export a `cookies.txt` manually.
+
+---
 
 ## Development
 
@@ -275,7 +256,7 @@ git clone https://github.com/luis-codex/lumen-dlp
 cd lumen-dlp
 uv sync
 
-# Editable install (changes in source reflect instantly)
+# Editable install (changes reflect instantly)
 uv tool install -e .
 
 # Lint and format

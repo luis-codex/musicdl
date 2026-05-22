@@ -3,11 +3,6 @@ from __future__ import annotations
 from enum import StrEnum
 
 
-class MediaType(StrEnum):
-    AUDIO = "audio"
-    VIDEO = "video"
-
-
 class AudioFormat(StrEnum):
     MP3 = "mp3"
     M4A = "m4a"

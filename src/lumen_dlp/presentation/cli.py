@@ -9,64 +9,100 @@ from typing import Annotated
 import typer
 from rich.console import Console
 
-from lumen_dlp.application import (
-    DownloadMediaCommand,
-    DownloadTranscriptsCommand,
-    ListPlaylistCommand,
-)
+from lumen_dlp.application import FetchCommand, InspectCommand
 from lumen_dlp.domain import (
     AudioFormat,
-    CookieSource,
-    MediaType,
+    AudioRequest,
+    AuthStrategy,
+    OutputSpec,
+    SubsRequest,
     SubtitleFormat,
     VideoFormat,
+    VideoRequest,
 )
 
 for stream in (sys.stdout, sys.stderr):
     if isinstance(stream, io.TextIOWrapper):
         stream.reconfigure(encoding="utf-8", errors="replace")
 
-PLAYLIST_URL = "https://music.youtube.com/playlist?list=LM"
-DEFAULT_BROWSER = os.environ.get("LUMEN_DLP_BROWSER", "firefox")
-DEFAULT_PROFILE = os.environ.get("LUMEN_DLP_BROWSER_PROFILE", "")
+DEFAULT_PLAYLIST = "https://music.youtube.com/playlist?list=LM"
+
+console = Console()
 
 app = typer.Typer(
     add_completion=False,
     no_args_is_help=True,
-    help="Universal media downloader (YouTube, X, TikTok, Instagram, 1000+ sites). Powered by yt-dlp + ffmpeg.",
+    help=(
+        "Universal media downloader (YouTube, X, TikTok, Instagram, 1000+ sites). "
+        "Powered by yt-dlp + ffmpeg.  Cookies are handled automatically."
+    ),
 )
-console = Console()
 
 
-# --- Reusable typer annotations -------------------------------------------------
+# --- Reusable option types --------------------------------------------------
 
 UrlArg = Annotated[str, typer.Argument(help="Video or playlist URL.")]
-MediaOpt = Annotated[MediaType, typer.Option("--type", "-t", help="Download audio or video.")]
+
+AudioFlag = Annotated[bool, typer.Option("--audio", help="Download audio.")]
 AudioFormatOpt = Annotated[
-    AudioFormat, typer.Option("--audio-format", "-a", help="Audio codec when --type audio.")
-]
-VideoFormatOpt = Annotated[
-    VideoFormat, typer.Option("--video-format", "-v", help="Container when --type video.")
+    AudioFormat, typer.Option("--audio-format", "-a", help="Audio codec (with --audio).")
 ]
 QualityOpt = Annotated[
     str, typer.Option("--quality", "-q", help="Audio quality: 0 (best) to 9, or kbps like '192'.")
 ]
+
+VideoFlag = Annotated[bool, typer.Option("--video", help="Download video.")]
+VideoFormatOpt = Annotated[
+    VideoFormat, typer.Option("--video-format", "-v", help="Video container (with --video).")
+]
 MaxHeightOpt = Annotated[
     int | None, typer.Option("--max-height", help="Cap video resolution (e.g. 1080, 720).")
 ]
+
+SubsFlag = Annotated[bool, typer.Option("--subs", help="Download subtitles.")]
+SubsFormatOpt = Annotated[
+    SubtitleFormat, typer.Option("--subs-format", help="Subtitle format (with --subs).")
+]
+LangsOpt = Annotated[
+    str,
+    typer.Option(
+        "--lang",
+        "-l",
+        help="Comma-separated subtitle languages (e.g. 'es,en,pt'). Empty = all available.",
+    ),
+]
+NoAutoOpt = Annotated[bool, typer.Option("--no-auto", help="Exclude auto-generated subtitles.")]
+
+AllFlag = Annotated[bool, typer.Option("--all", help="Shortcut for --audio --video --subs.")]
+
+BrowserOpt = Annotated[
+    str | None,
+    typer.Option(
+        "--browser",
+        help=(
+            "Force cookies from this browser (skip anonymous). "
+            "Default: anonymous first, auto-detect a browser on auth errors."
+        ),
+    ),
+]
+ProfileOpt = Annotated[
+    str | None,
+    typer.Option(
+        "--profile",
+        help="Browser profile path (for Firefox forks like Zen). Used with --browser.",
+    ),
+]
+NoCookiesFlag = Annotated[
+    bool,
+    typer.Option("--no-cookies", help="Never use browser cookies, even when the site needs auth."),
+]
+
 OutputOpt = Annotated[Path, typer.Option("--output", "-o", help="Output directory.")]
 ThumbnailOpt = Annotated[
     bool, typer.Option("--thumbnail/--no-thumbnail", help="Embed cover/thumbnail.")
 ]
 MetadataOpt = Annotated[
     bool, typer.Option("--metadata/--no-metadata", help="Embed track metadata.")
-]
-ArchiveOpt = Annotated[
-    Path | None,
-    typer.Option(
-        "--archive",
-        help="Archive file tracking downloaded IDs. Defaults to <output>/.lumen-dlp-archive.txt.",
-    ),
 ]
 ConcurrentOpt = Annotated[
     int,
@@ -77,166 +113,189 @@ ConcurrentOpt = Annotated[
         help="Parallel workers for playlists (default 1 = serial).",
     ),
 ]
+ArchiveOpt = Annotated[
+    Path | None,
+    typer.Option(
+        "--archive",
+        help="Archive file tracking downloaded IDs. Defaults to <output>/.lumen-dlp-archive.txt.",
+    ),
+]
 
 
-@app.callback()
-def _global(
-    ctx: typer.Context,
-    browser: Annotated[
-        str, typer.Option("--browser", help="Browser to read cookies from.")
-    ] = DEFAULT_BROWSER,
-    profile: Annotated[
-        str, typer.Option("--profile", help="Browser profile path (for Zen/Firefox forks).")
-    ] = DEFAULT_PROFILE,
-) -> None:
-    ctx.obj = CookieSource(browser=browser, profile=profile or None)
+# --- Helpers ----------------------------------------------------------------
 
 
-def _cookies(ctx: typer.Context) -> CookieSource:
-    return ctx.obj
+def _auth_from_flags(
+    browser_flag: str | None, profile_flag: str | None, no_cookies: bool
+) -> AuthStrategy:
+    if no_cookies:
+        return AuthStrategy.no_cookies()
+    browser = browser_flag or os.environ.get("LUMEN_DLP_BROWSER")
+    if browser:
+        profile = profile_flag or os.environ.get("LUMEN_DLP_BROWSER_PROFILE") or None
+        return AuthStrategy.force_browser(browser=browser, profile=profile)
+    return AuthStrategy.auto()
 
 
-def _build_download(
+def _build_output_spec(
     *,
-    url: str,
-    cookies: CookieSource,
-    media: MediaType,
+    audio: bool,
     audio_format: AudioFormat,
-    video_format: VideoFormat,
     quality: str,
+    video: bool,
+    video_format: VideoFormat,
     max_height: int | None,
-    output: Path,
+    subs: bool,
+    subs_format: SubtitleFormat,
+    langs: str,
+    no_auto: bool,
+    all_: bool,
     thumbnail: bool,
     metadata: bool,
-    archive: Path | None,
-    concurrent: int,
-) -> DownloadMediaCommand:
-    return DownloadMediaCommand(
-        url=url,
-        cookies=cookies,
-        media_type=media,
-        audio_format=audio_format,
-        video_format=video_format,
-        audio_quality=quality,
-        max_height=max_height,
-        output_dir=output,
+) -> OutputSpec:
+    if all_:
+        audio = video = subs = True
+    # No output flag at all → sensible default: audio m4a.
+    if not (audio or video or subs):
+        audio = True
+
+    lang_tuple = tuple(token.strip() for token in langs.split(",") if token.strip())
+
+    return OutputSpec(
+        audio=AudioRequest(format=audio_format, quality=quality) if audio else None,
+        video=VideoRequest(format=video_format, max_height=max_height) if video else None,
+        subs=(
+            SubsRequest(format=subs_format, langs=lang_tuple, include_auto=not no_auto)
+            if subs
+            else None
+        ),
         embed_thumbnail=thumbnail,
         embed_metadata=metadata,
-        archive_file=archive,
-        concurrent=concurrent,
-        console=console,
     )
 
 
-@app.command("list")
-def list_songs(
-    ctx: typer.Context,
-    url: UrlArg = PLAYLIST_URL,
-) -> None:
-    """List songs from a YouTube Music playlist (defaults to Liked Music)."""
-    command = ListPlaylistCommand(url=url, cookies=_cookies(ctx), console=console)
-    raise typer.Exit(code=command.execute())
+# --- Commands ---------------------------------------------------------------
 
 
-@app.command("download")
-def download(
-    ctx: typer.Context,
-    url: UrlArg = PLAYLIST_URL,
-    media: MediaOpt = MediaType.AUDIO,
+@app.command("get")
+def get(
+    url: UrlArg = DEFAULT_PLAYLIST,
+    audio: AudioFlag = False,
     audio_format: AudioFormatOpt = AudioFormat.M4A,
-    video_format: VideoFormatOpt = VideoFormat.MP4,
     quality: QualityOpt = "0",
+    video: VideoFlag = False,
+    video_format: VideoFormatOpt = VideoFormat.MP4,
     max_height: MaxHeightOpt = None,
+    subs: SubsFlag = False,
+    subs_format: SubsFormatOpt = SubtitleFormat.SRT,
+    langs: LangsOpt = "",
+    no_auto: NoAutoOpt = False,
+    all_: AllFlag = False,
+    browser: BrowserOpt = None,
+    profile: ProfileOpt = None,
+    no_cookies: NoCookiesFlag = False,
     output: OutputOpt = Path("downloads"),
     thumbnail: ThumbnailOpt = True,
     metadata: MetadataOpt = True,
     concurrent: ConcurrentOpt = 1,
 ) -> None:
-    """Download a video or playlist as audio or video, in the chosen format."""
-    command = _build_download(
-        url=url,
-        cookies=_cookies(ctx),
-        media=media,
+    """Download from a URL. Any combo of --audio, --video, --subs (default: audio m4a)."""
+    auth = _auth_from_flags(browser, profile, no_cookies)
+    output_spec = _build_output_spec(
+        audio=audio,
         audio_format=audio_format,
-        video_format=video_format,
         quality=quality,
+        video=video,
+        video_format=video_format,
         max_height=max_height,
-        output=output,
+        subs=subs,
+        subs_format=subs_format,
+        langs=langs,
+        no_auto=no_auto,
+        all_=all_,
         thumbnail=thumbnail,
         metadata=metadata,
-        archive=None,
-        concurrent=concurrent,
     )
-    raise typer.Exit(code=command.execute())
+    cmd = FetchCommand(
+        url=url,
+        output=output_spec,
+        auth=auth,
+        output_dir=output,
+        archive_file=None,
+        concurrent=concurrent,
+        console=console,
+    )
+    raise typer.Exit(code=cmd.execute())
 
 
 @app.command("sync")
 def sync(
-    ctx: typer.Context,
-    url: UrlArg = PLAYLIST_URL,
-    media: MediaOpt = MediaType.AUDIO,
+    url: UrlArg = DEFAULT_PLAYLIST,
+    audio: AudioFlag = False,
     audio_format: AudioFormatOpt = AudioFormat.M4A,
-    video_format: VideoFormatOpt = VideoFormat.MP4,
     quality: QualityOpt = "0",
+    video: VideoFlag = False,
+    video_format: VideoFormatOpt = VideoFormat.MP4,
     max_height: MaxHeightOpt = None,
-    output: OutputOpt = Path("downloads"),
+    subs: SubsFlag = False,
+    subs_format: SubsFormatOpt = SubtitleFormat.SRT,
+    langs: LangsOpt = "",
+    no_auto: NoAutoOpt = False,
+    all_: AllFlag = False,
     archive: ArchiveOpt = None,
+    browser: BrowserOpt = None,
+    profile: ProfileOpt = None,
+    no_cookies: NoCookiesFlag = False,
+    output: OutputOpt = Path("downloads"),
     thumbnail: ThumbnailOpt = True,
     metadata: MetadataOpt = True,
     concurrent: ConcurrentOpt = 1,
 ) -> None:
-    """Download only new items from a playlist, skipping anything already downloaded."""
-    archive_path = archive if archive is not None else output / ".lumen-dlp-archive.txt"
-    command = _build_download(
-        url=url,
-        cookies=_cookies(ctx),
-        media=media,
+    """Incremental download — skip what's already archived. Pair with cron / Task Scheduler."""
+    auth = _auth_from_flags(browser, profile, no_cookies)
+    output_spec = _build_output_spec(
+        audio=audio,
         audio_format=audio_format,
-        video_format=video_format,
         quality=quality,
+        video=video,
+        video_format=video_format,
         max_height=max_height,
-        output=output,
+        subs=subs,
+        subs_format=subs_format,
+        langs=langs,
+        no_auto=no_auto,
+        all_=all_,
         thumbnail=thumbnail,
         metadata=metadata,
-        archive=archive_path,
-        concurrent=concurrent,
     )
-    console.print(f"[dim]Archive:[/dim] {archive_path}")
-    raise typer.Exit(code=command.execute())
-
-
-@app.command("transcripts")
-def transcripts(
-    ctx: typer.Context,
-    url: UrlArg = PLAYLIST_URL,
-    output: OutputOpt = Path("transcripts"),
-    lang: Annotated[
-        list[str], typer.Option("--lang", "-l", help="Subtitle languages (repeatable).")
-    ] = ["es", "en"],  # noqa: B006 — typer requires a mutable default for repeatable options
-    auto: Annotated[
-        bool, typer.Option("--auto/--no-auto", help="Include auto-generated subtitles.")
-    ] = True,
-    fmt: Annotated[
-        SubtitleFormat, typer.Option("--format", "-f", help="Subtitle format.")
-    ] = SubtitleFormat.SRT,
-    archive: ArchiveOpt = None,
-    concurrent: ConcurrentOpt = 1,
-) -> None:
-    """Download transcripts/subtitles from a video or playlist (when available)."""
     archive_path = archive if archive is not None else output / ".lumen-dlp-archive.txt"
-    command = DownloadTranscriptsCommand(
+    cmd = FetchCommand(
         url=url,
-        cookies=_cookies(ctx),
+        output=output_spec,
+        auth=auth,
         output_dir=output,
-        languages=tuple(lang),
-        include_auto=auto,
-        subtitle_format=fmt,
         archive_file=archive_path,
         concurrent=concurrent,
         console=console,
     )
     console.print(f"[dim]Archive:[/dim] {archive_path}")
-    raise typer.Exit(code=command.execute())
+    raise typer.Exit(code=cmd.execute())
+
+
+@app.command("list")
+def list_cmd(
+    url: UrlArg = DEFAULT_PLAYLIST,
+    browser: BrowserOpt = None,
+    profile: ProfileOpt = None,
+    no_cookies: NoCookiesFlag = False,
+) -> None:
+    """Show what's at a URL without downloading.
+
+    For a single video: title, duration, available subtitles.  For a playlist: track list.
+    """
+    auth = _auth_from_flags(browser, profile, no_cookies)
+    cmd = InspectCommand(url=url, auth=auth, console=console)
+    raise typer.Exit(code=cmd.execute())
 
 
 def main() -> None:
